@@ -19,111 +19,126 @@ export const getAllTaxes = async (req, res) => {
 };
 
 export const createTax = async (req, res) => {
-    try {
-      const { fromDate, toDate, fromValue, toValue, taxType, taxRate } = req.body;
-  
-      // Convert string dates to Date objects
-      const fromDateObj = new Date(fromDate);
-      const toDateObj = new Date(toDate);
-  
-      // Check if dates are valid
-      if (isNaN(fromDateObj.getTime()) || isNaN(toDateObj.getTime())) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid date format'
-        });
-      }
-  
-      // Check if fromDate is before toDate
-      if (fromDateObj > toDateObj) {
-        return res.status(400).json({
-          success: false,
-          message: 'From date must be before to date'
-        });
-      }
-  
-      // Check if fromValue is less than toValue
-      if (fromValue >= toValue) {
-        return res.status(400).json({
-          success: false,
-          message: 'From value must be less than to value'
-        });
-      }
-  
-      // Check if fromValue and toValue are valid numbers
-      if (isNaN(fromValue) || isNaN(toValue)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Values must be valid numbers'
-        });
-      }
-  
-      // Check if tax rate is within range
-      if (isNaN(taxRate) || taxRate < 0 || taxRate > 100) {
-        return res.status(400).json({
-          success: false,
-          message: 'Tax rate must be a number between 0 and 100'
-        });
-      }
-  
-      // Check for overlapping value ranges on the same date range
-      const overlappingTax = await Tax.findOne({
-        fromDate: { $lte: toDateObj },
-        toDate: { $gte: fromDateObj },
-        $or: [
-          { fromValue: { $lte: toValue, $gte: fromValue } },
-          { toValue: { $gte: fromValue, $lte: toValue } },
-          { $and: [{ fromValue: { $lte: fromValue } }, { toValue: { $gte: toValue } }] }
-        ]
-      });
-  
-      if (overlappingTax) {
-        return res.status(400).json({
-          success: false,
-          message: 'Value range overlaps with existing records for the selected date range'
-        });
-      }
-  
-      // Calculate tax amount
-      const taxAmount = ((toValue - fromValue) * taxRate) / 100;
-  
-      // Create new tax calculation
-      const newTax = new Tax({
-        fromDate: fromDateObj,
-        toDate: toDateObj,
-        fromValue,
-        toValue,
-        taxType,
-        taxRate,
-        taxAmount
-      });
-  
-      // Save to database
-      await newTax.save();
-  
-      res.status(201).json({
-        success: true,
-        data: newTax
-      });
-    } catch (error) {
-      // Check for duplicate key error
-      if (error.code === 11000) {
-        return res.status(400).json({
-          success: false,
-          message: 'This tax calculation already exists'
-        });
-      }
-  
-      console.error('Error creating tax calculation:', error);
-      res.status(500).json({
+  try {
+    const { fromDate, toDate, fromValue, toValue, taxType, taxRate } = req.body;
+
+    // Convert string dates to Date objects
+    const fromDateObj = new Date(fromDate);
+    const toDateObj = new Date(toDate);
+
+    // Check if dates are valid
+    if (isNaN(fromDateObj.getTime()) || isNaN(toDateObj.getTime())) {
+      return res.status(400).json({
         success: false,
-        message: 'Server Error',
-        error: error.message
+        message: 'Invalid date format'
       });
     }
-  };
-  
 
+    // Check if fromDate is before toDate
+    if (fromDateObj > toDateObj) {
+      return res.status(400).json({
+        success: false,
+        message: 'From date must be before to date'
+      });
+    }
+
+    // Check if fromValue is less than toValue
+    if (fromValue >= toValue) {
+      return res.status(400).json({
+        success: false,
+        message: 'From value must be less than to value'
+      });
+    }
+
+    // Check if fromValue and toValue are valid numbers
+    if (isNaN(fromValue) || isNaN(toValue)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Values must be valid numbers'
+      });
+    }
+
+    // Check if tax rate is within range
+    if (isNaN(taxRate) || taxRate < 0 || taxRate > 100) {
+      return res.status(400).json({
+        success: false,
+        message: 'Tax rate must be a number between 0 and 100'
+      });
+    }
+    
+    // Check if a record with the same date and tax type already exists
+    const existingTaxRecord = await Tax.findOne({
+      fromDate: {
+        $gte: new Date(fromDateObj.setHours(0, 0, 0, 0)),
+        $lt: new Date(fromDateObj.setHours(23, 59, 59, 999))
+      },
+      taxType: taxType
+    });
+    
+    if (existingTaxRecord) {
+      return res.status(400).json({
+        success: false,
+        message: `A ${taxType} record already exists for this date. Please try another GST type or date.`
+      });
+    }
+
+    // Check for overlapping value ranges on the same date range
+    const overlappingTax = await Tax.findOne({
+      fromDate: { $lte: toDateObj },
+      toDate: { $gte: fromDateObj },
+      $or: [
+        { fromValue: { $lte: toValue, $gte: fromValue } },
+        { toValue: { $gte: fromValue, $lte: toValue } },
+        { $and: [{ fromValue: { $lte: fromValue } }, { toValue: { $gte: toValue } }] }
+      ]
+    });
+
+    if (overlappingTax) {
+      return res.status(400).json({
+        success: false,
+        message: 'Value range overlaps with existing records for the selected date range'
+      });
+    }
+
+    // Calculate tax amount
+    const taxAmount = ((toValue - fromValue) * taxRate) / 100;
+
+    // Create new tax calculation
+    const newTax = new Tax({
+      fromDate: fromDateObj,
+      toDate: toDateObj,
+      fromValue,
+      toValue,
+      taxType,
+      taxRate,
+      taxAmount
+    });
+
+    // Save to database
+    await newTax.save();
+
+    res.status(201).json({
+      success: true,
+      data: newTax
+    });
+  } catch (error) {
+    // Check for duplicate key error
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: 'This tax calculation already exists'
+      });
+    }
+
+    console.error('Error creating tax calculation:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server Error',
+      error: error.message
+    });
+  }
+};
+  
 export const getTaxById = async (req, res) => {
   try {
     const tax = await Tax.findById(req.params.id);
