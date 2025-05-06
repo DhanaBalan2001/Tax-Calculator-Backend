@@ -1,3 +1,8 @@
+![React](https://img.shields.io/badge/frontend-React-blue?logo=react)
+![TailwindCSS](https://img.shields.io/badge/styling-Tailwind_CSS-38bdf8?logo=tailwindcss)
+![Node.js](https://img.shields.io/badge/backend-Node.js-green?logo=node.js)
+![Express](https://img.shields.io/badge/server-Express-black?logo=express)
+![Status](https://img.shields.io/badge/status-Complete-brightgreen)
 
 ---
 
